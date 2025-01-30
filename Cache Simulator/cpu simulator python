@@ -1,0 +1,86 @@
+import random
+import matplotlib.pyplot as plt
+
+# Cache Simulator Class
+class CacheSimulator:
+    def __init__(self, cache_size, block_size, associativity):
+        self.cache_size = cache_size  # Total cache size in bytes
+        self.block_size = block_size  # Block size in bytes
+        self.associativity = associativity  # Associativity (1 for direct-mapped, >1 for set-associative)
+        
+        # Calculate number of cache lines and sets
+        self.num_lines = cache_size // block_size
+        self.num_sets = self.num_lines // associativity
+        
+        # Initialize cache structure
+        self.cache = [[{'valid': False, 'tag': None, 'lru_counter': 0} for _ in range(associativity)] 
+                      for _ in range(self.num_sets)]
+        
+        # Statistics
+        self.hits = 0
+        self.misses = 0
+
+    def access_cache(self, address):
+        # Calculate tag and index
+        block_offset = address % self.block_size
+        index = (address // self.block_size) % self.num_sets
+        tag = address // (self.block_size * self.num_sets)
+        
+        # Check for hit or miss
+        for way in range(self.associativity):
+            if self.cache[index][way]['valid'] and self.cache[index][way]['tag'] == tag:
+                self.hits += 1
+                self.cache[index][way]['lru_counter'] = 0  # Reset LRU counter
+                return 'Hit'
+        
+        # If miss, update cache
+        self.misses += 1
+        # Find the least recently used (LRU) block
+        lru_way = max(range(self.associativity), key=lambda way: self.cache[index][way]['lru_counter'])
+        self.cache[index][lru_way] = {'valid': True, 'tag': tag, 'lru_counter': 0}
+        
+        # Update LRU counters
+        for way in range(self.associativity):
+            if way != lru_way:
+                self.cache[index][way]['lru_counter'] += 1
+        
+        return 'Miss'
+
+# Memory Access Generator
+def generate_memory_accesses(num_accesses, address_range):
+    return [random.randint(0, address_range) for _ in range(num_accesses)]
+
+# Performance Analysis and Visualization
+def analyze_cache_performance(cache_sizes, block_size, associativity, num_accesses, address_range):
+    hit_rates = []
+    
+    for cache_size in cache_sizes:
+        cache = CacheSimulator(cache_size, block_size, associativity)
+        memory_accesses = generate_memory_accesses(num_accesses, address_range)
+        
+        for address in memory_accesses:
+            cache.access_cache(address)
+        
+        hit_rate = cache.hits / (cache.hits + cache.misses) * 100
+        hit_rates.append(hit_rate)
+        
+        print(f"Cache Size: {cache_size} Bytes, Hit Rate: {hit_rate:.2f}%")
+    
+    # Plot results
+    plt.bar(cache_sizes, hit_rates)
+    plt.xlabel("Cache Size (Bytes)")
+    plt.ylabel("Hit Rate (%)")
+    plt.title("Cache Performance Analysis")
+    plt.show()
+
+# Main Program
+if __name__ == "__main__":
+    # Parameters
+    cache_sizes = [1024, 2048, 4096, 8192]  # Cache sizes to test (in bytes)
+    block_size = 64  # Block size in bytes
+    associativity = 2  # 2-way set-associative cache
+    num_accesses = 10000  # Number of memory accesses to simulate
+    address_range = 0xFFFF  # Range of memory addresses (0 to 65535)
+    
+    # Run cache performance analysis
+    analyze_cache_performance(cache_sizes, block_size, associativity, num_accesses, address_range)
